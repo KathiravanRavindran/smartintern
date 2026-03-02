@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Student Dashboard</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f3f4f6; }
+        .card { background: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        input, textarea, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background: #4f46e5; color: white; cursor: pointer; font-weight: bold; border: none; }
+        .job-card { border: 1px solid #ddd; padding: 15px; margin-top: 10px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>My Profile</h2>
+        <input type="text" id="userName" placeholder="Full Name">
+        <input type="text" id="userCollege" placeholder="College Name">
+        <textarea id="userSkills" placeholder="Skills (comma separated)"></textarea>
+        <button id="updateBtn">Update Profile</button>
+    </div>
+
+    <div class="card">
+        <h2>Available Internships</h2>
+        <div id="internshipFeed">Fetching...</div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, where, getDocs, updateDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDP0MrbNUI6o_Xs7EoKDCkYKqaJTxCVi3c",
+        authDomain: "intern-c6981.firebaseapp.com",
+        projectId: "intern-c6981",
+        storageBucket: "intern-c6981.firebasestorage.app",
+        messagingSenderId: "1078780967021",
+        appId: "1:1078780967021:web:f6889ed9ff5ccab93d6764"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const email = localStorage.getItem('userEmail');
+
+    if(!email) window.location.href = 'login.html';
+
+    // 1. Load Profile
+    const loadProfile = async () => {
+        const q = query(collection(db, "users"), where("email", "==", email));
+        const snap = await getDocs(q);
+        if(!snap.empty) {
+            const data = snap.docs[0].data();
+            document.getElementById('userName').value = data.name || "";
+            document.getElementById('userCollege').value = data.college || "";
+            document.getElementById('userSkills').value = data.skills || "";
+        }
+    };
+    loadProfile();
+
+    // 2. Update Profile
+    document.getElementById('updateBtn').onclick = async () => {
+        const q = query(collection(db, "users"), where("email", "==", email));
+        const snap = await getDocs(q);
+        await updateDoc(doc(db, "users", snap.docs[0].id), {
+            name: document.getElementById('userName').value,
+            college: document.getElementById('userCollege').value,
+            skills: document.getElementById('userSkills').value.toLowerCase()
+        });
+        alert("Profile Updated!");
+    };
+
+    // 3. Internship Feed
+    onSnapshot(collection(db, "internships"), (snap) => {
+        const feed = document.getElementById('internshipFeed');
+        feed.innerHTML = "";
+        snap.forEach(d => {
+            const job = d.data();
+            feed.innerHTML += `
+                <div class="job-card">
+                    <h4>${job.title}</h4>
+                    <p>${job.description}</p>
+                    <button onclick="applyNow('${d.id}', '${job.title}')" style="background:#10b981">Apply Now</button>
+                </div>`;
+        });
+    });
+
+    window.applyNow = async (id, title) => {
+        const q = query(collection(db, "users"), where("email", "==", email));
+        const snap = await getDocs(q);
+        const user = snap.docs[0].data();
+        await addDoc(collection(db, "applications"), {
+            internshipId: id, internshipTitle: title, studentEmail: email,
+            studentName: user.name, studentSkills: user.skills, appliedAt: new Date()
+        });
+        alert("Applied!");
+    };
+</script>
+</body>
+</html>

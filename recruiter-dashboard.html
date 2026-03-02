@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Recruiter Dashboard</title>
+    <style>
+        :root { --primary: #4f46e5; --success: #10b981; --bg: #f3f4f6; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 40px; background: var(--bg); }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        h1, h3 { color: #1f2937; margin-top: 0; }
+        
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; }
+        button { padding: 12px 24px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        
+        #postBtn { background: var(--primary); color: white; width: 100%; }
+        #filterBtn { background: #374151; color: white; margin-left: 10px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        th, td { border-bottom: 1px solid #e5e7eb; padding: 15px; text-align: left; }
+        th { background: var(--success); color: white; border-radius: 4px 4px 0 0; }
+        .match-badge { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Recruiter Panel</h1>
+
+    <div class="card">
+        <h3>Post New Internship</h3>
+        <input type="text" id="jobTitle" placeholder="Internship Title (e.g., UI/UX Designer)">
+        <input type="text" id="jobDesc" placeholder="Brief Job Description">
+        <button id="postBtn">Post Internship</button>
+    </div>
+
+    <div class="card">
+        <h3>Incoming Applications</h3>
+        <div style="display: flex; margin-bottom: 20px;">
+            <input type="text" id="skillFilter" placeholder="Enter skill to rank (e.g., Python)" style="margin: 0;">
+            <button id="filterBtn">Rank Applicants</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Position Applied</th>
+                    <th>Student Skills</th>
+                    <th>Match Status</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDP0MrbNUI6o_Xs7EoKDCkYKqaJTxCVi3c",
+        authDomain: "intern-c6981.firebaseapp.com",
+        projectId: "intern-c6981",
+        storageBucket: "intern-c6981.firebasestorage.app",
+        messagingSenderId: "1078780967021",
+        appId: "1:1078780967021:web:f6889ed9ff5ccab93d6764"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const recruiterEmail = localStorage.getItem('userEmail');
+
+    // 1. POST INTERNSHIP LOGIC
+    document.getElementById('postBtn').addEventListener('click', async () => {
+        const title = document.getElementById('jobTitle').value.trim();
+        const desc = document.getElementById('jobDesc').value.trim();
+
+        if (!title || !desc) {
+            alert("Please fill in all fields.");
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, "internships"), {
+                title: title,
+                description: desc,
+                recruiterEmail: recruiterEmail,
+                postedAt: serverTimestamp() // Better than new Date() for global consistency
+            });
+            
+            alert("Internship successfully posted!");
+            // Clear inputs
+            document.getElementById('jobTitle').value = "";
+            document.getElementById('jobDesc').value = "";
+        } catch (error) {
+            console.error("Error posting internship:", error);
+            alert("Failed to post: " + error.message);
+        }
+    });
+
+    // 2. LOAD & RANK APPLICANTS LOGIC
+    async function loadApps() {
+        const filter = document.getElementById('skillFilter').value.toLowerCase().trim();
+        const tableBody = document.getElementById('tableBody');
+        tableBody.innerHTML = "<tr><td colspan='4'>Loading applications...</td></tr>";
+
+        try {
+            const snap = await getDocs(collection(db, "applications"));
+            let apps = [];
+
+            snap.forEach(doc => {
+                const data = doc.data();
+                // Simple Match Scoring: 1 if student has the filter skill, 0 if not
+                const isMatch = filter && data.studentSkills && data.studentSkills.toLowerCase().includes(filter);
+                apps.push({ ...data, score: isMatch ? 1 : 0 });
+            });
+
+            // Sort so Matches appear at the top
+            apps.sort((a, b) => b.score - a.score);
+
+            tableBody.innerHTML = apps.map(a => `
+                <tr>
+                    <td>${a.studentName || 'Anonymous'}</td>
+                    <td>${a.internshipTitle}</td>
+                    <td>${a.studentSkills || 'Not specified'}</td>
+                    <td>${a.score > 0 ? '<span class="match-badge">✅ Top Match</span>' : '-'}</td>
+                </tr>
+            `).join('');
+
+            if (apps.length === 0) {
+                tableBody.innerHTML = "<tr><td colspan='4'>No applications found.</td></tr>";
+            }
+        } catch (error) {
+            console.error("Error loading apps:", error);
+        }
+    }
+
+    // Attach listener to Filter Button
+    document.getElementById('filterBtn').addEventListener('click', loadApps);
+    
+    // Initial Load
+    loadApps();
+</script>
+</body>
+</html>

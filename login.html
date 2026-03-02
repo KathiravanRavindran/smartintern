@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Internship Portal | Auth</title>
+    <style>
+        :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .login-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        h2 { text-align: center; color: #1f2937; margin-top: 0; }
+        .role-toggle { display: flex; background: #e5e7eb; padding: 4px; border-radius: 8px; margin-bottom: 1rem; position: relative; }
+        .role-toggle button { flex: 1; border: none; background: none; padding: 10px; cursor: pointer; font-weight: 600; z-index: 1; }
+        .slider { position: absolute; top: 4px; left: 4px; width: calc(50% - 4px); height: calc(100% - 8px); background: white; border-radius: 6px; transition: 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.8rem; margin-bottom: 5px; color: #6b7280; }
+        input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; }
+        .login-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .switch-mode { text-align: center; margin-top: 1rem; font-size: 0.9rem; color: #4b5563; }
+        .switch-mode span { color: var(--primary); cursor: pointer; font-weight: bold; text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <h2 id="formTitle">Portal Login</h2>
+    <div class="role-toggle">
+        <div class="slider" id="slider"></div>
+        <button type="button" onclick="setRole('student')">Student</button>
+        <button type="button" onclick="setRole('recruiter')">Recruiter</button>
+    </div>
+    <form id="authForm">
+        <div class="input-group">
+            <label>Email</label>
+            <input type="email" id="email" required placeholder="email@example.com">
+        </div>
+        <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="password" required placeholder="••••••••">
+        </div>
+        <input type="hidden" id="userRole" value="student">
+        <button type="submit" class="login-btn" id="submitBtn">Login as Student</button>
+    </form>
+    <div class="switch-mode"><p id="toggleText">Don't have an account? <span onclick="toggleMode()">Register Now</span></p></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDP0MrbNUI6o_Xs7EoKDCkYKqaJTxCVi3c",
+        authDomain: "intern-c6981.firebaseapp.com",
+        projectId: "intern-c6981",
+        storageBucket: "intern-c6981.firebasestorage.app",
+        messagingSenderId: "1078780967021",
+        appId: "1:1078780967021:web:f6889ed9ff5ccab93d6764"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let isLoginMode = true;
+
+    window.toggleMode = () => {
+        isLoginMode = !isLoginMode;
+        const role = document.getElementById('userRole').value;
+        document.getElementById('formTitle').innerText = isLoginMode ? "Portal Login" : "Portal Registration";
+        document.getElementById('submitBtn').innerText = `${isLoginMode ? 'Login' : 'Register'} as ${role}`;
+        document.getElementById('toggleText').innerHTML = isLoginMode ? `Don't have an account? <span onclick="toggleMode()">Register Now</span>` : `Already have an account? <span onclick="toggleMode()">Login Now</span>`;
+    };
+
+    window.setRole = (role) => {
+        document.getElementById('userRole').value = role;
+        document.getElementById('slider').style.transform = role === 'student' ? 'translateX(0)' : 'translateX(100%)';
+        document.getElementById('submitBtn').style.background = role === 'student' ? '#4f46e5' : '#10b981';
+        document.getElementById('submitBtn').innerText = `${isLoginMode ? 'Login' : 'Register'} as ${role}`;
+    };
+
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const selectedRole = document.getElementById('userRole').value;
+
+        try {
+            if (isLoginMode) {
+                const q = query(collection(db, "users"), where("email", "==", email), where("password", "==", password), where("userRole", "==", selectedRole));
+                const qs = await getDocs(q);
+                if (!qs.empty) {
+                    localStorage.setItem('userEmail', email); // IMPORTANT: Save for dashboard
+                    window.location.href = selectedRole === 'student' ? 'student-dashboard.html' : 'recruiter-dashboard.html';
+                } else { alert("Invalid credentials."); }
+            } else {
+                await addDoc(collection(db, "users"), { email, password, userRole: selectedRole, name: "", college: "", skills: "" });
+                alert("Success! Please login.");
+                location.reload();
+            }
+        } catch (e) { alert(e.message); }
+    });
+</script>
+</body>
+</html>
